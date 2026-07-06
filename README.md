@@ -1,135 +1,113 @@
-# Realtime API Agents Demo
+# 宮廟解籤 Realtime Demo
 
-This is a simple demonstration of more advanced, agentic patterns built on top of the Realtime API. In particular, this demonstrates:
-- Sequential agent handoffs according to a defined agent graph (taking inspiration from [OpenAI Swarm](https://github.com/openai/swarm))
-- Background escalation to more intelligent models like o4-mini for high-stakes decisions
-- Prompting models to follow a state machine, for example to accurately collect things like names and phone numbers with confirmation character by character to authenticate a user.
+This project is a Next.js + OpenAI Realtime voice app that has been redirected from a generic multi-agent demo toward a **宮廟解籤** experience.
 
-Here's a quick [demo video](https://x.com/OpenAIDevs/status/1880306081517432936) if you'd like a walkthrough. You should be able to use this repo to prototype your own multi-agent realtime voice app in less than 20 minutes!
+The current focus is a Traditional Chinese, voice-friendly temple divination assistant that helps users:
+- ask for a 籤號
+- receive a concise, plain-language interpretation of the 籤意
+- continue the same divination thread with follow-up questions
+- keep the conversation structured, short, and suitable for speech
 
-![Screenshot of the Realtime API Agents Demo](/public/screenshot.png)
+The current app centers on:
+- `宮廟解籤` as the primary interaction pattern
+- Traditional Chinese responses
+- concise spoken replies
+- strict sign-number handling and flow control
+- a stateful conversation structure for asking the sign number, interpreting the sign, and then narrowing the user's topic
+
+## Features
+
+- Realtime voice conversation through OpenAI Realtime
+- Temple-divination prompt flow built around `解籤`
+- Transcript view and event log for debugging
+- Audio playback controls and push-to-talk / voice activity detection options
+- Multiple agent configs remain available for experimentation, but the temple divination flow is the current default direction
 
 ## Setup
 
-- This is a Next.js typescript app
-- Install dependencies with `npm i`
-- Add your `OPENAI_API_KEY` to your env. Either add it to your `.bash_profile` or equivalent file, or copy `.env.sample` to `.env` and add it there.
-- Start the server with `npm run dev`
-- Open your browser to [http://localhost:3000](http://localhost:3000) to see the app. It should automatically connect to the `simpleExample` Agent Set.
+1. Install dependencies:
 
-## Configuring Agents
-Configuration in `src/app/agentConfigs/simpleExample.ts`
-```javascript
-import { AgentConfig } from "@/app/types";
-import { injectTransferTools } from "./utils";
+   ```bash
+   npm install
+   ```
 
-// Define agents
-const haikuWriter: AgentConfig = {
-  name: "haikuWriter",
-  publicDescription: "Agent that writes haikus.", // Context for the agent_transfer tool
-  instructions:
-    "Ask the user for a topic, then reply with a haiku about that topic.",
-  tools: [],
-};
+2. Add your `OPENAI_API_KEY` to the environment.
 
-const greeter: AgentConfig = {
-  name: "greeter",
-  publicDescription: "Agent that greets the user.",
-  instructions:
-    "Please greet the user and ask them if they'd like a Haiku. If yes, transfer them to the 'haiku' agent.",
-  tools: [],
-  downstreamAgents: [haikuWriter],
-};
+   You can use a local `.env` file or your shell profile.
 
-// add the transfer tool to point to downstreamAgents
-const agents = injectTransferTools([greeter, haikuWriter]);
+3. Start the development server:
 
-export default agents;
-```
+   ```bash
+   npm run dev
+   ```
 
-This fully specifies the agent set that was used in the interaction shown in the screenshot above.
+4. Open the app in your browser:
 
-### Sequence Diagram of CustomerServiceRetail Flow
+   ```text
+   http://localhost:3000
+   ```
 
-This diagram illustrates the interaction flow defined in `src/app/agentConfigs/customerServiceRetail/`.
+## Usage
 
-<details>
-<summary><strong>Show CustomerServiceRetail Flow Diagram</strong></summary>
+The current experience is designed around a temple-style oracle flow.
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant WebClient as Next.js Client
-    participant NextAPI as /api/session
-    participant RealtimeAPI as OpenAI Realtime API
-    participant AgentManager as Agents (authentication, returns, sales, simulatedHuman)
-    participant o1mini as "o4-mini" (Escalation Model)
+Typical entry points:
+- tell the assistant which籤 you drew
+- ask for a plain-language explanation of the sign
+- continue with the same sign if you want to ask about career, relationships, money, health, or other concerns
 
-    Note over WebClient: User navigates to ?agentConfig=customerServiceRetail
-    User->>WebClient: Open Page
-    WebClient->>NextAPI: GET /api/session
-    NextAPI->>RealtimeAPI: POST /v1/realtime/sessions
-    RealtimeAPI->>NextAPI: Returns ephemeral session
-    NextAPI->>WebClient: Returns ephemeral token (JSON)
+The assistant is instructed to keep answers:
+- in Traditional Chinese
+- short enough for voice playback
+- direct and non-ornamental
+- focused on interpretation, not on unrelated conversation
 
-    Note right of WebClient: Start RTC handshake
-    WebClient->>RealtimeAPI: Offer SDP (WebRTC)
-    RealtimeAPI->>WebClient: SDP answer
-    WebClient->>WebClient: DataChannel "oai-events" established
+## Repository layout
 
-    Note over AgentManager: Default agent is "authentication"
-    User->>WebClient: "Hi, I'd like to return my snowboard."
-    WebClient->>AgentManager: conversation.item.create (role=user)
-    WebClient->>RealtimeAPI: {type: "conversation.item.create"}
-    WebClient->>RealtimeAPI: {type: "response.create"}
+- `src/app/api/session/route.ts` creates the Realtime session and returns the ephemeral token
+- `src/app/App.tsx` contains the main client experience
+- `src/app/agentConfigs/` contains the agent prompt sets and flow logic
+- `src/app/components/` contains the transcript, event log, toolbar, and related UI pieces
+- `src/app/hooks/` contains event handling and audio helpers
+- `src/app/lib/` contains Realtime connection and utility code
 
-    authentication->>AgentManager: Requests user info, calls authenticate_user_information()
-    AgentManager-->>WebClient: function_call => name="authenticate_user_information"
-    WebClient->>WebClient: handleFunctionCall => verifies details
+## Temple-divination flow
 
-    Note over AgentManager: After user is authenticated
-    authentication->>AgentManager: transferAgents("returns")
-    AgentManager-->>WebClient: function_call => name="transferAgents" args={ destination: "returns" }
-    WebClient->>WebClient: setSelectedAgentName("returns")
+The temple flow is organized as a structured conversation:
 
-    Note over returns: The user wants to process a return
-    returns->>AgentManager: function_call => checkEligibilityAndPossiblyInitiateReturn
-    AgentManager-->>WebClient: function_call => name="checkEligibilityAndPossiblyInitiateReturn"
+1. Ask for the sign number
+2. Interpret the sign in plain language
+3. Ask what area the user wants to understand
+4. Collect the minimum context needed for the follow-up explanation
+5. Deliver the final reading in one clear pass
 
-    Note over WebClient: The WebClient calls /api/chat/completions with model="o4-mini"
-    WebClient->>o1mini: "Is this item eligible for return?"
-    o1mini->>WebClient: "Yes/No (plus notes)"
+The prompt set also includes guardrails for:
+- sign-number locking
+- translation and rephrasing of the latest divination content
+- one-question-at-a-time behavior
+- avoiding unrelated topics
+- keeping replies suitable for speech
 
-    Note right of returns: Returns uses the result from "o4-mini"
-    returns->>AgentManager: "Return is approved" or "Return is denied"
-    AgentManager->>WebClient: conversation.item.create (assistant role)
-    WebClient->>User: Displays final verdict
-```
+## Notes
 
-</details>
+- This repo is still an agent playground under the hood, but the current product direction is clearly temple divination rather than customer-service simulations.
+- The UI includes transcript and event panels for inspecting the realtime exchange while developing or debugging the flow.
 
+## Current implementation notes
 
-### Next steps
-- Check out the configs in `src/app/agentConfigs`. The example above is a minimal demo that illustrates the core concepts.
-- [frontDeskAuthentication](src/app/agentConfigs/frontDeskAuthentication) Guides the user through a step-by-step authentication flow, confirming each value character-by-character, authenticates the user with a tool call, and then transfers to another agent. Note that the second agent is intentionally "bored" to show how to prompt for personality and tone.
-- [customerServiceRetail](src/app/agentConfigs/customerServiceRetail) Also guides through an authentication flow, reads a long offer from a canned script verbatim, and then walks through a complex return flow which requires looking up orders and policies, gathering user context, and checking with `o4-mini` to ensure the return is eligible. To test this flow, say that you'd like to return your snowboard and go through the necessary prompts!
+- `src/app/App.tsx` is the main application entry point for the live experience. It owns the visible title, the welcome message, and the conversation behavior.
+- `src/app/api/session/route.ts` now targets the Realtime API v2 flow used by this project. The session creation logic is handled there.
+- `src/app/agentConfigs/aigoCustomerService.ts` holds the main temple-divination prompt set. The `instructions` field is where the system-style prompt text is assembled and passed into the agent config.
+- Vercel deployment must include `OPENAI_API_KEY` in the environment, or the session route cannot create a Realtime session.
 
-### Defining your own agents
-- You can copy these to make your own multi-agent voice app! Once you make a new agent set config, add it to `src/app/agentConfigs/index.ts` and you should be able to select it in the UI in the "Scenario" dropdown menu.
-- To see how to define tools and toolLogic, including a background LLM call, see [src/app/agentConfigs/customerServiceRetail/returns.ts](src/app/agentConfigs/customerServiceRetail/returns.ts)
-- To see how to define a detailed personality and tone, and use a prompt state machine to collect user information step by step, see [src/app/agentConfigs/frontDeskAuthentication/authentication.ts](src/app/agentConfigs/frontDeskAuthentication/authentication.ts)
-- To see how to wire up Agents into a single Agent Set, see [src/app/agentConfigs/frontDeskAuthentication/index.ts](src/app/agentConfigs/frontDeskAuthentication/index.ts)
-- If you want help creating your own prompt using these conventions, we've included a metaprompt [here](src/app/agentConfigs/voiceAgentMetaprompt.txt), or you can use our [Voice Agent Metaprompter GPT](https://chatgpt.com/g/g-678865c9fb5c81918fa28699735dd08e-voice-agent-metaprompt-gpt)
+## Deployment
 
-### Customizing Output Guardrails
-Assistant messages are checked for safety and compliance using a guardrail function before being finalized in the transcript. This is implemented in [`src/app/hooks/useHandleServerEvent.ts`](src/app/hooks/useHandleServerEvent.ts) as the `processGuardrail` function, which is invoked on each assistant message to run a moderation/classification check. You can review or customize this logic by editing the `processGuardrail` function definition and its invocation inside `useHandleServerEvent`.
+For Vercel:
 
-## UI
-- You can select agent scenarios in the Scenario dropdown, and automatically switch to a specific agent with the Agent dropdown.
-- The conversation transcript is on the left, including tool calls, tool call responses, and agent changes. Click to expand non-message elements.
-- The event log is on the right, showing both client and server events. Click to see the full payload.
-- On the bottom, you can disconnect, toggle between automated voice-activity detection or PTT, turn off audio playback, and toggle logs.
+1. Add `OPENAI_API_KEY` in the project environment variables.
+2. Confirm the Realtime model setting used by `src/app/api/session/route.ts` matches the account capability you want to deploy with.
+3. Deploy the app normally through Vercel after the secret is set.
 
-## Core Contributors
-- Noah MacCallum - [noahmacca](https://x.com/noahmacca)
-- Ilan Bigio - [ibigio](https://github.com/ibigio)
+## License
+
+MIT
